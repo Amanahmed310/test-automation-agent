@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#F9F6F4">
+    <title>Automation Agent</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Automation Agent home">
+        <span><strong>Automation Agent</strong><small>AI test generation</small></span>
+      </a>
+      <div class="topbar-actions">
+        <button id="open-settings" class="workspace-trigger" type="button" aria-haspopup="dialog" aria-controls="settings-overlay">
+          <span class="workspace-trigger-copy"><strong>Workspace setup</strong><small id="workspace-status">Checking setup…</small></span>
+          <span class="badge incomplete" id="connection-badge">CHECKING</span>
+          <span class="workspace-trigger-arrow" aria-hidden="true">⚙</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section id="settings-overlay" class="settings-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="settings-dialog">
+          <div class="settings-dialog-heading">
+            <div><span class="step">01</span><div><h2 id="settings-title">Workspace setup</h2><p>Set these once on this computer. Workspace values are saved locally; the Azure PAT is stored securely by the operating system.</p></div></div>
+            <button id="close-settings" class="icon-button" type="button" aria-label="Close workspace setup">×</button>
+          </div>
+          <div class="setup-state-row"><span class="setup-state-indicator" id="setup-state-indicator" aria-hidden="true"></span><span id="setup-state-text">Checking workspace configuration…</span></div>
+          <section class="pat-setup-card" aria-label="Azure DevOps personal access token setup">
+            <div class="pat-setup-copy"><strong>Azure DevOps personal access token</strong><small>Saved in the operating system credential store. Enter a new value only to replace it.</small><div class="pat-setup-status" aria-live="polite"><span id="pat-quick-indicator" class="pat-quick-indicator"></span><span id="pat-quick-help">Checking token…</span></div></div>
+            <form id="pat-quick-form" class="pat-quick-form">
+              <label class="visually-hidden" for="pat-quick-input">Azure DevOps personal access token</label>
+              <input id="pat-quick-input" type="password" autocomplete="new-password" placeholder="Enter PAT to replace saved token" aria-describedby="pat-quick-help">
+              <button id="pat-quick-save" class="button secondary" type="submit">Save PAT</button>
+            </form>
+          </section>
+        <form id="settings-form" class="settings-grid">
+          <label>Azure DevOps organization<input name="organization" autocomplete="organization" placeholder="your-organization" required></label>
+          <label>Project<input name="project" placeholder="Project name" required></label>
+          <label class="span-2">Framework repository path<input name="repositoryPath" placeholder="C:\\work\\playwright-framework" required></label>
+          <section class="context-sources-panel span-2" aria-labelledby="context-sources-title">
+            <div class="context-sources-heading"><strong id="context-sources-title">Generation context</strong><p>Configure the sources Smart Generate can use. Code Review Graph and local RAG work together to find relevant framework patterns.</p></div>
+            <label>Code Review Graph Python executable<input name="graphPythonCommand" placeholder="python or full path to python.exe"><small id="graph-database-status">Graph database is detected from the framework repository at <code>.code-review-graph/graph.db</code>. Enter the Python executable where the Code Review Graph package is installed; the app starts its read-only MCP server for each Smart Generate run.</small></label>
+            <div class="rag-panel graph-panel" aria-label="Code Review Graph controls">
+              <div><strong>Code Review Graph MCP</strong><p id="graph-maintenance-status" role="status">Set up &amp; start builds or updates the graph database, then checks MCP. You can also run the database update separately here.</p><small id="graph-server-info">Loading MCP server configuration…</small></div>
+              <div class="graph-actions"><button id="graph-check" class="button secondary" type="button">Test MCP connection</button><button id="graph-update" class="button secondary" type="button">Build / update graph</button></div>
+            </div>
+            <div id="graph-maintenance-error" class="alert" role="alert" hidden></div>
+            <div class="rag-panel" aria-label="Local retrieval index">
+              <div><strong>Local RAG index</strong><p id="rag-status" role="status">Checking local index…</p></div>
+              <button id="rag-rebuild" class="button secondary" type="button">Build / refresh index</button>
+            </div>
+            <div class="context-toggle-row workspace-context-toggle">
+              <label class="context-toggle"><input id="use-local-rag" type="checkbox" checked><span><strong>Use local RAG for Smart Generate</strong><small>On: local framework retrieval + read-only Code Review Graph MCP. Off: skip local retrieval and use read-only MCP context only. This preference is saved in this browser.</small></span></label>
+            </div>
+            <div id="rag-error" class="alert" role="alert" hidden></div>
+          </section>
+          <label class="span-2">Generated test output path<input name="outputPath" placeholder="C:\\work\\playwright-framework\\tests\\generated" required></label>
+          <label class="span-2">Smart Generate CLI command<input name="smartCliCommand" placeholder="copilot"><small>Type <code>copilot</code> or <code>codex</code>; the next Smart Generate uses it immediately. Save workspace to make it your default. Install and sign in to each CLI once.</small></label>
+          <label class="span-2">Smart Generate model<select name="smartModel" id="smart-model"></select><small id="smart-model-help">Choose a model for the selected CLI. Model access depends on your CLI account and plan; the CLI will validate it when generation starts.</small></label>
+          <label class="span-2" id="custom-model-row" hidden>Custom model ID<input name="customSmartModel" id="custom-smart-model" placeholder="Enter the exact model ID"></label>
+          <label class="span-2">Smart Generate AI credit limit (optional)<input name="smartCreditLimit" type="number" min="30" max="1000000" step="1" placeholder="No limit"><small>Copilot supports a soft per-run limit from 30 AI credits. Actual usage appears after the run when reported by the CLI.</small></label>
+          <div class="form-footer span-2"><span id="settings-message" class="inline-message" role="status"></span><button class="button primary" type="submit">Save locally</button></div>
+        </form>
+        </div>
+      </section>
+
+      <section class="service-check-panel main-service-check" aria-label="Set up and start generation services">
+        <div class="service-check-heading"><span class="service-check-icon" aria-hidden="true">✓</span><div><span class="service-check-eyebrow">WORKSPACE CHECK</span><strong>Set up and start</strong><p id="services-check-summary" role="status">Save settings, build or update the Code Review Graph database, check MCP, refresh RAG, and verify the selected CLI. Results appear below as each check completes.</p></div></div>
+        <div class="service-check-results" aria-live="polite">
+          <div class="service-result"><span class="service-result-dot" id="service-mcp-dot"></span><span class="service-result-label">Code Review Graph MCP</span><span id="service-mcp-state" class="service-state" data-state="idle">Not checked</span></div>
+          <div class="service-result"><span class="service-result-dot" id="service-rag-dot"></span><span class="service-result-label">Local RAG index</span><span id="service-rag-state" class="service-state" data-state="idle">Not checked</span></div>
+          <div class="service-result"><span class="service-result-dot" id="service-cli-dot"></span><span class="service-result-label">Selected CLI</span><span id="service-cli-state" class="service-state" data-state="idle">Not checked</span></div>
+        </div>
+        <button id="check-services" class="button primary service-check-button" type="button"><span>Set up &amp; start</span><span aria-hidden="true">→</span></button>
+      </section>
+
+      <div class="workspace-grid">
+        <div class="workspace-left">
+          <section class="intro">
+            <div class="eyebrow"><span class="live-dot"></span> LOCAL WORKSPACE</div>
+            <h1>Turn test cases<br>into <span>Playwright tests.</span></h1>
+            <p>Connect your Azure DevOps project, fetch a test case, and generate into your framework.</p>
+            <div class="platforms"><span>Windows</span><i></i><span>macOS</span><i></i><span>Playwright</span></div>
+          </section>
+
+          <section class="card fetch-card" aria-labelledby="fetch-title">
+        <div class="card-heading">
+          <div><span class="step">02</span><h2 id="fetch-title">Fetch an Azure test case</h2></div>
+          <span class="quiet-label">WORK ITEM</span>
+        </div>
+        <form id="fetch-form" class="fetch-form">
+        <label>Test ID<input name="testId" inputmode="numeric" pattern="[0-9]+" placeholder="e.g. 12345" required></label>
+          <button class="button primary" type="submit"><span>Fetch test case</span><span aria-hidden="true">→</span></button>
+        </form>
+        <p class="security-note"><span aria-hidden="true">▣</span> The app reads the saved PAT from the OS credential store and sends it to Azure DevOps over HTTPS.</p>
+        <div id="fetch-error" class="alert" role="alert" hidden></div>
+        <section id="test-result" class="test-result" aria-live="polite" hidden>
+          <div class="result-title"><div><span class="result-id" id="result-id"></span><h3 id="result-title"></h3></div><a id="result-link" href="#" target="_blank" rel="noreferrer">Open in Azure ↗</a></div>
+          <div id="result-description" class="description" hidden></div>
+          <div class="steps-heading"><strong>Test steps</strong><span id="steps-count"></span></div>
+          <div id="steps-list" class="steps-list"></div>
+          <div id="no-steps" class="empty-steps" hidden>No structured steps were returned for this work item.</div>
+          <section class="attachments-panel" aria-labelledby="attachments-title">
+            <div class="attachments-heading"><strong id="attachments-title">Test attachments</strong><span id="attachments-count">No files</span></div>
+            <p class="attachment-help">Azure work-item attachments are fetched automatically. Add DOM files (.html/.txt/.xml/.json), Excel data (.xlsx/.csv), or images. Confirmed scenario values come from attached files; when a sheet has a TestCase ID column, only the exact matching row is used. If data or framework functionality is missing, Smart Generate creates the best draft it can and labels inferred values GUESS or unsupported functionality TODO. The shared framework workbook is only a runtime destination, never a source the generator searches. XLSX context scans up to 5 sheets and 2,000 rows per sheet. Smart Generate sends selected files to your chosen AI CLI and may use more credits/tokens. Images require a vision-capable model. File data stays in memory for up to 1 hour; temporary prompt/image files are removed after generation.</p>
+            <div id="attachment-list" class="attachment-list" aria-live="polite"></div>
+            <label class="attachment-picker">Add files<input id="attachment-input" type="file" multiple accept=".html,.htm,.txt,.xml,.json,.csv,.xlsx,.png,.jpg,.jpeg,.jfif,.gif,.webp,.heic,.heif"></label>
+            <p id="attachment-error" class="attachment-error" role="alert" hidden></p>
+            <label class="generation-notes" for="generation-notes">Additional instructions <span>for Smart Generate</span>
+              <textarea id="generation-notes" maxlength="5000" rows="4" placeholder="Add details for this test, such as which environment behavior to cover or which data row to use."></textarea>
+              <small>Up to 5,000 characters. Sent with the selected files to your AI CLI; Quick Generate creates the standard scaffold and does not use these instructions.</small>
+            </label>
+          </section>
+          <div class="generate-row">
+            <button class="button secondary generate-button" type="button" data-mode="quick">Quick Generate</button>
+            <button class="button smart generate-button" type="button" data-mode="smart">✦ Smart Generate</button>
+          </div>
+        </section>
+          </section>
+        </div>
+
+        <div class="workspace-right">
+          <section class="progress-card" aria-label="Generation status">
+        <div class="progress-icon">✦</div>
+        <div class="progress-copy"><strong id="generation-title">Generation workspace</strong><span id="generation-stage">Choose Quick Generate for a step scaffold or Smart Generate for a test drafted by your selected AI CLI.</span></div>
+        <span class="coming-badge" id="generation-state">NOT STARTED</span>
+          </section>
+          <section id="generation-details" class="generation-details" hidden aria-live="polite">
+        <div class="generation-progress"><div id="generation-progress-bar"></div></div>
+        <div class="generation-meta"><span id="generation-percent">0%</span><span id="generation-output"></span></div>
+        <p id="generation-sources" class="generation-sources" hidden></p>
+        <p id="generation-context" class="generation-sources" hidden></p>
+        <p id="generation-usage" class="generation-usage" hidden></p>
+        <div id="generation-error" class="alert" hidden></div>
+        <div id="generated-preview" hidden>
+          <div class="preview-heading"><strong>Generated script</strong><button id="copy-script" class="button secondary" type="button">Copy script</button></div>
+          <pre><code id="generated-script"></code></pre>
+        </div>
+        <section id="refinement-panel" class="refinement-panel" hidden aria-labelledby="refinement-title">
+          <div class="preview-heading"><strong id="refinement-title">Refine this test</strong><span class="history-note">Your edits update the saved script</span></div>
+          <p class="refinement-help">Chat with the selected AI CLI to change the test or provide test data. Every message makes another AI request; any configured Copilot credit cap applies to each message separately.</p>
+          <div id="refinement-messages" class="refinement-messages" aria-live="polite"></div>
+          <form id="refinement-form" class="refinement-form">
+            <label for="refinement-input">What would you like to change?</label>
+            <textarea id="refinement-input" maxlength="5000" rows="3" placeholder="For example: Use the test data value 'Modern Oak' for the Finish column and add an assertion that it appears in the selected item."></textarea>
+            <div class="refinement-form-footer"><small>Up to 5,000 characters. The current test and previous successful edits stay in context.</small><button id="refinement-submit" class="button smart" type="submit">Send edit</button></div>
+          </form>
+        </section>
+          </section>
+          <section class="usage-history" aria-label="Recent generation usage">
+        <div class="preview-heading"><strong>Recent Smart Generate usage</strong><span class="history-note">Saved in this browser for comparison</span></div>
+        <div id="usage-history-rows" class="usage-history-rows"></div>
+          </section>
+        </div>
+      </div>
+
+      <footer>Automation Agent <span>•</span> Local-first setup</footer>
+    </main>
+    <div id="generation-overlay" class="generation-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="overlay-title" aria-describedby="overlay-message">
+      <section class="generation-overlay-card">
+        <div class="overlay-sparkle" aria-hidden="true">✦</div>
+        <span class="overlay-kicker">AUTOMATION AGENT</span>
+        <h2 id="overlay-title">Making your test</h2>
+        <p id="overlay-message" class="overlay-message">A little test magic is getting everything ready…</p>
+        <div class="overlay-progress"><div id="overlay-progress-bar"></div></div>
+        <div class="overlay-meta"><span id="overlay-percent">0%</span><span id="overlay-stage">Getting started</span></div>
+        <p id="overlay-credits" class="overlay-credits"></p>
+        <button id="stop-generation" class="button overlay-stop" type="button">Stop generation</button>
+      </section>
+    </div>
+    <button id="open-feedback" class="feedback-launcher" type="button" aria-haspopup="dialog" aria-controls="feedback-overlay">✦ Feedback</button>
+    <section id="feedback-overlay" class="feedback-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="feedback-title">
+      <div class="feedback-dialog">
+        <div class="feedback-dialog-heading">
+          <div><span class="feedback-kicker">YOUR FEEDBACK</span><h2 id="feedback-title">Help us improve Automation Agent</h2></div>
+          <button id="close-feedback" class="icon-button" type="button" aria-label="Close feedback form">×</button>
+        </div>
+        <p class="feedback-help">Enter your feedback and Outlook will open a draft on this computer. Add a recipient, review the message, and click Send.</p>
+        <form id="feedback-form" class="feedback-form">
+          <label for="feedback-email">Your email <span class="history-note">optional, for replies</span></label>
+          <input id="feedback-email" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com">
+          <label for="feedback-message">Your feedback</label>
+          <textarea id="feedback-message" maxlength="5000" rows="5" required placeholder="Tell us what worked well or what could be better…"></textarea>
+          <label class="feedback-image-picker" for="feedback-image">Attach an image (optional)<input id="feedback-image" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/heic,image/heif"></label>
+          <small id="feedback-image-name" class="feedback-image-name">One image, up to 3 MB.</small>
+          <div class="feedback-form-footer"><p id="feedback-status" class="feedback-status" role="status" aria-live="polite"></p><button id="feedback-submit" class="button smart" type="submit">Open Outlook draft</button></div>
+        </form>
+      </div>
+    </section>
+  </body>
+</html>

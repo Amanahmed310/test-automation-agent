@@ -1,0 +1,16 @@
+{
+  "name": "test-automation-agent",
+  "private": true,
+  "version": "1.3.0",
+  "description": "Local cross-platform tool for turning Azure DevOps test cases into Playwright drafts",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@napi-rs/keyring": "^2.1.1"
+  }
+}
