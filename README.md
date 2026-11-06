@@ -75,3 +75,7 @@ Generated code is a draft. The app performs limited static checks, but it does n
 - The app does not execute generated tests. Review generated source and attachments before using them.
 - Temporary prompts and attachments are removed after generation; selected attachments are held in local memory while the app is running.
 - Generated files are written only to the output directory you configure.
+
+## License
+
+This project is available under the MIT License. See [`LICENSE`](LICENSE) for details.
